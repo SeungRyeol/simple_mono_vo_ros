@@ -1,17 +1,19 @@
 #include "mono_vo.h"
 
+#include <utility>
+
 MonoVO::MonoVO(int max_frame, int min_num_pts, std::string fn_kitti)
-    : max_frame_(max_frame), min_num_pts_(min_num_pts), fn_kitti_(fn_kitti), id_(0)
+    : max_frame_(max_frame), min_num_pts_(min_num_pts), fn_kitti_(std::move(fn_kitti)), id_(0)
 {
   // Set several paths.
   fn_calib_ = fn_kitti_ + "/sequences/00/calib.txt";
-  fn_poses_ = fn_kitti_ + "/poses/00.txt";
-  fn_images_ = fn_kitti_ + "/sequences/00/image_2/";
+  fn_poses_ = fn_kitti_ + "/sequences/00/poses.txt";
+  fn_images_ = fn_kitti_ + "/sequences/00/image_1/";
 
   // Set the trajectory image.
   img_traj_ = cv::Mat::zeros(600, 600, CV_8UC3);
 
-  // Fetch the focal length and pricipal point.
+  // Fetch the focal length and principal point.
   FetchIntrinsicParams();
 
   Initialization();
@@ -20,25 +22,27 @@ MonoVO::MonoVO(int max_frame, int min_num_pts, std::string fn_kitti)
 void MonoVO::ReduceVector(std::vector<int> &v) {
   int j=0;
 
-  for(int i=0; i<int(v.size()); i++) {
-    if(status_[i]) {
-      v[j++] = v[i];
+  for(int i=0; i<int(v.size()); i++) { // for each element in v
+    if(status_[i]) { // if status is true
+      v[j++] = v[i]; // keep the element
     }
   }
-  v.resize(j);
+  v.resize(j); // resize v to the number of elements with status 1
 }
 
-void MonoVO::FeatureTracking(cv::Mat img1,
-                             cv::Mat img2,
-                             std::vector<cv::Point2f> &p1,
-                             std::vector<cv::Point2f> &p2)
+void MonoVO::FeatureTracking(const cv::Mat& img1, const cv::Mat& img2,
+                             std::vector<cv::Point2f> &p1, std::vector<cv::Point2f> &p2)
 {
   std::vector<float> error;
   cv::Size window_size = cv::Size(21,21);
-  cv::TermCriteria tc = cv::TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 30, 0.01);
+  cv::TermCriteria tc = cv::TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS,
+                                         30,
+                                         0.01);
 
   // Feature tracking using lucas-kanade tracker.
-  cv::calcOpticalFlowPyrLK(img1, img2, p1, p2, status_, error, window_size, 3, tc, 0, 0.001);
+  cv::calcOpticalFlowPyrLK(img1, img2, p1, p2,
+                           status_, error, window_size, 3,
+                           tc, 0, 0.001);
 
   // Getting rid of points for which the KLT tracking failed or those who have gone outside the frame.
   int index_correction=0;
@@ -46,11 +50,12 @@ void MonoVO::FeatureTracking(cv::Mat img1,
   for(int i=0; i<status_.size(); i++) {
     cv::Point2f pt = p2.at(i - index_correction);
 
-    if((status_.at(i)==0) || (pt.x<0) || (pt.y<0)) {
+    if((status_.at(i)==0) || (pt.x<0) || (pt.y<0)) { // If KLT tracking fails or the point is outside the frame.
       if((pt.x<0) || (pt.y<0)) {
         status_.at(i) = 0;
       }
 
+      // Removing the point from further consideration.
       p1.erase(p1.begin() + (i-index_correction));
       p2.erase(p2.begin() + (i-index_correction));
       index_correction++;
@@ -58,17 +63,18 @@ void MonoVO::FeatureTracking(cv::Mat img1,
   }
 }
 
-void MonoVO::FeatureDetection(cv::Mat img, std::vector<cv::Point2f> &p)
+void MonoVO::FeatureDetection(const cv::Mat& img, std::vector<cv::Point2f> &p) const
 {
   std::vector<cv::KeyPoint> kpt;
 
   // Extract features using FAST algorithm.
+  // threshold: difference between intensity of the central pixel and pixels of a circle around this pixel
   cv::FAST(img, kpt, 20, true);
 
-  // Sort keypoints ascending by response.
-  std::sort(kpt.begin(), kpt.end(), [](const cv::KeyPoint &a, const cv::KeyPoint &b) {
-                                      return a.response > b.response;
-                                    });
+  // Sort key-points ascending by response. (response: strength of feature)
+  std::sort(kpt.begin(),
+            kpt.end(),
+            [](const cv::KeyPoint &a, const cv::KeyPoint &b) { return a.response > b.response; });
 
   // Take the minimum number of feature point.
   for(int i=0; i<min_num_pts_; i++) {
@@ -95,7 +101,7 @@ void MonoVO::FetchIntrinsicParams() {
         pp_.x = std::stod(token); // principal point x
       }
       if(j==7) {
-        pp_.y = std::stod(token); // printcipal point y
+        pp_.y = std::stod(token); // principal point y
       }
     }
     fin.close();
@@ -138,9 +144,9 @@ void MonoVO::ComputeAbsoluteScale(int nframe)
     return;
   }
 
-  scale_ = std::sqrt( (x-prev_x)*(x-prev_x) +
-                      (y-prev_y)*(y-prev_y) +
-                      (z-prev_z)*(z-prev_z));
+  scale_ = std::sqrt((x-prev_x)*(x-prev_x) +
+                       (y-prev_y)*(y-prev_y) +
+                       (z-prev_z)*(z-prev_z));
 }
 
 void MonoVO::Initialization() {
@@ -150,7 +156,7 @@ void MonoVO::Initialization() {
   std::string fn1 = fn_images_ + util::AddZeroPadding(0, 6) + ".png";
   std::string fn2 = fn_images_ + util::AddZeroPadding(1, 6) + ".png";
 
-  // Load the fist two images.
+  // Load the first two images.
   cv::Mat img1 = cv::imread(fn1, cv::IMREAD_GRAYSCALE);
   cv::Mat img2 = cv::imread(fn2, cv::IMREAD_GRAYSCALE);
 
@@ -159,7 +165,7 @@ void MonoVO::Initialization() {
   FeatureDetection(img1, p1);
   FeatureTracking(img1, img2, p1, p2);
 
-  // Find essential matrix E and recover R,t from E.
+  // (1) Find essential matrix E and (2) recover R,t from E.
   E_ = cv::findEssentialMat(p2, p1, f_, pp_, cv::RANSAC, 0.999, 1.0, mask_);
   cv::recoverPose(E_, p2, p1, curr_R_, curr_t_, f_, pp_, mask_);
 
@@ -176,6 +182,7 @@ void MonoVO::PoseTracking(int nframe) {
     return;
   }
 
+  // Load the current image.
   std::string fn = fn_images_ + util::AddZeroPadding(nframe, 6) + ".png";
   cv::Mat curr_img_color = cv::imread(fn);
   cv::cvtColor(curr_img_color, curr_img_, cv::COLOR_BGR2GRAY);
@@ -183,9 +190,10 @@ void MonoVO::PoseTracking(int nframe) {
   // Feature tracking.
   FeatureTracking(prev_img_, curr_img_, prev_pts_, curr_pts_);
 
+  // Resize the vector to leave only the feature point id that was successful in tracking
   ReduceVector(idx_);
 
-  // Find essential matrix E and recover R,t from E.
+  // (1) Find essential matrix E and (2) recover R,t from E.
   E_ = cv::findEssentialMat(curr_pts_, prev_pts_, f_, pp_, cv::RANSAC, 0.999, 1.0, mask_);
   cv::recoverPose(E_, curr_pts_, prev_pts_, curr_R_, curr_t_, f_, pp_, mask_);
 

@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
   ros::Publisher pub_image = nh.advertise<sensor_msgs::Image>("image", 1);
 
   int max_frame;          // maximum frame to play in KITTI sequence.
-  int min_num_pts;       // minimum number of feature points.
+  int min_num_pts;        // minimum number of feature points.
   std::string fn_kitti;   // path to KITTI dataset.
 
   priv_nh.getParam("max_frame", max_frame);
@@ -35,6 +35,7 @@ int main(int argc, char **argv) {
 
   // Starts from the third image (first and second images are used for the initialization).
   int nframe = 2;
+
   while(ros::ok()) {
     if(nframe >= max_frame) {
       break;
@@ -59,32 +60,29 @@ int main(int argc, char **argv) {
     round->set32fPrecision(3);
 
     std::cout << std::endl << "[+] " << util::AddZeroPadding(nframe,6) << std::endl;
-    std::cout << "Rotation(euler):  " <<  std::setprecision(3) << "[" << euler.val[0] << ", " << euler.val[1] << ", " << euler.val[2] << "]" << std::endl;
+    std::cout << "Rotation(euler):  " << std::setprecision(3) << "[" << euler.val[0] << ", " << euler.val[1] << ", " << euler.val[2] << "]" << std::endl;
     std::cout << "Translate(x,y,z): " << round->format(t.t()) << std::endl;
 
     transform.stamp_ = ros::Time::now();
     transform.setRotation(tf::Quaternion(quat[0], quat[1], quat[2], quat[3]));
     transform.setOrigin(tf::Vector3(t.at<double>(0), t.at<double>(1), t.at<double>(2)));
 
-    // Braodcast the transform between /world and /camera.
+    // Broadcast the transform between /world and /camera.
     tf_broadcaster.sendTransform(transform);
 
     nav_msgs::Odometry odom;
     odom.header.stamp = ros::Time::now();
-    odom.header.frame_id = "/world";
-    odom.child_frame_id = "/camera";
-
-    geometry_msgs::Quaternion odom_quat;
-    odom_quat.x = quat[0];
-    odom_quat.y = quat[1];
-    odom_quat.z = quat[2];
-    odom_quat.w = quat[3];
+    odom.header.frame_id = "world";
+    odom.child_frame_id = "camera";
 
     // Set the position and rotation.
     odom.pose.pose.position.x = t.at<double>(0);
     odom.pose.pose.position.y = t.at<double>(1);
     odom.pose.pose.position.z = t.at<double>(2);
-    odom.pose.pose.orientation = odom_quat;
+    odom.pose.pose.orientation.x = quat[0];
+    odom.pose.pose.orientation.y = quat[1];
+    odom.pose.pose.orientation.z = quat[2];
+    odom.pose.pose.orientation.w = quat[3];
 
     // publish to /odom.
     pub_odom.publish(odom);
@@ -94,13 +92,13 @@ int main(int argc, char **argv) {
     cv_bridge::CvImagePtr cv_ptr(new cv_bridge::CvImage);
     cv_ptr->encoding = "bgr8";
     cv_ptr->header.stamp = ros::Time::now();
-    cv_ptr->header.frame_id = "/world";
+    cv_ptr->header.frame_id = "world";
     cv_ptr->image = dst;
 
     // publish to /image.
     pub_image.publish(cv_ptr->toImageMsg());
 
-    // Increase the number of frame.
+    // Update the current number of frame.
     nframe++;
   }
 

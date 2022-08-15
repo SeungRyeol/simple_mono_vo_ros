@@ -63,133 +63,160 @@
 #include <fstream>
 #include <map>
 
-/// \class MonoVO
-/// \brief This class performs the visual odometry algorithm using mono image sequences.
+/**
+ * @class MonoVO
+ * @brief This class performs the visual odometry algorithm using mono image sequences.
+ */
 class MonoVO {
  public:
-  /// \brief The constructor.
-  /// \param[in] max_frame Maximum number of frame to play.
-  /// \param[in] min_num_pts Minimum number of features.
-  /// \param[in] fn_kitti Path to kitti dataset.
+  /**
+   * @brief The constructor.
+   * @param[in] max_frame Maximum number of frame to play.
+   * @param[in] min_num_pts Minimum number of features.
+   * @param[in] fn_kitti Path to kitti dataset.
+   */
   MonoVO(int max_frame, int min_num_pts, std::string fn_kitti);
 
-  /// \brief Tract the features by using lucas-kanade optical flow.
-  /// \param[in] img1 Input first image.
-  /// \param[in] img2 Input second image.
-  /// \param[in] p1 Features tracked by the feature extractor (e.g., FAST).
-  /// \param[out] p2 Features being tracked by the lucas-kanade optical flow.
-  void FeatureTracking(cv::Mat img1, cv::Mat img2, std::vector<cv::Point2f> &p1, std::vector<cv::Point2f> &p2);
+  /**
+   * @brief Tract the features by using lucas-kanade optical flow.
+   * @param[in] img1 Input first image.
+   * @param[in] img2 Input second image.
+   * @param[in] p1 Features tracked by the feature extractor (e.g., FAST).
+   * @param[out] p2 Features being tracked by the lucas-kanade optical flow.
+   */
+  void FeatureTracking(const cv::Mat& img1, const cv::Mat& img2,
+                       std::vector<cv::Point2f> &p1, std::vector<cv::Point2f> &p2);
 
-  /// \brief Detect features.
-  /// \param[in] img Input image.
-  /// \param[out] p Vector of feature points.
-  void FeatureDetection(cv::Mat img, std::vector<cv::Point2f> &p);
+  /**
+   * @brief Detect features.
+   * @param[in] img Input image.
+   * @param[out] p Vector of feature points.
+   */
+  void FeatureDetection(const cv::Mat& img, std::vector<cv::Point2f> &p) const;
 
-  /// \brief Perform the intialization process with the first two frames.
+  /**
+   * @brief Perform the initialization process with the first two frames.
+   */
   void Initialization();
 
-  /// \brief Pose tracking using lucas-kanade optical flow.
-  /// \param[in] The number of current frame.
+  /**
+   * @brief Pose tracking using lucas-kanade optical flow.
+   * @param[in] nframe The number of current frame.
+   */
   void PoseTracking(int nframe);
 
-  /// \brief Visualize the result.
-  /// \param[in] nframe The number of current frame.
+  /**
+   * @brief Visualize the result.
+   * @param[in] nframe The number of current frame.
+   */
   void Visualize(int nframe);
 
-  /// \brief Reduce the size of vector after tracking.
-  /// \param[in/out] v The vector to be reduced.
+  /**
+   * @brief Reduce the size of vector after tracking.
+   * @param[in/out] v The vector to be reduced.
+   */
   void ReduceVector(std::vector<int> &v);
 
-  /// \brief This method gets the focal length and principal point from the calibration file.
+  /**
+   * @brief Get the focal length and principal point from the calibration file.
+   */
   void FetchIntrinsicParams();
 
-  /// \brief Compute the absolute scale.
-  /// \param[in] nframe Number of frame.
+  /**
+   * @brief Compute the absolute scale.
+   * @param[in] nframe The number of current frame.
+   */
   void ComputeAbsoluteScale(int nframe);
 
-  /// \brief Get the last camera rotation.
+  /**
+   * @brief Get the last camera rotation.
+   */
   cv::Mat GetRotation() { return prev_R_; }
 
-  /// \brief Get the last camera translation.
+  /**
+   * @brief Get the last camera translation.
+   */
   cv::Mat GetTranslation() { return prev_t_; }
 
-  /// \brief Get the result image.
+  /**
+   * @brief Get the result image.
+   */
   cv::Mat GetResultImage() { return dst_; }
 
  private:
-  /// \brief Maximum number of frame to play.
+  /// @brief Maximum number of frame to play.
   int max_frame_;
 
-  /// \brief Minimum number of features.
+  /// @brief Minimum number of features.
   int min_num_pts_;
 
-  /// \brief Path to kitti dataset.
+  /// @brief Path to kitti dataset.
   std::string fn_kitti_;
 
-  /// \brief Path to calibration file.
+  /// @brief Path to calibration file.
   std::string fn_calib_;
 
-  /// \brief Path to ground truth pose file.
+  /// @brief Path to ground truth pose file.
   std::string fn_poses_;
 
-  /// \brief Path to image file.
+  /// @brief Path to image file.
   std::string fn_images_;
 
-  /// \brief Previous gray image.
+  /// @brief Previous gray image.
   cv::Mat prev_img_;
 
-  /// \brief Current gray image.
+  /// @brief Current gray image.
   cv::Mat curr_img_;
 
-  /// \brief Result image to be shown.
+  /// @brief Result image to be shown.
   cv::Mat dst_;
 
-  /// \brief Previous features.
+  /// @brief Previous features.
   std::vector<cv::Point2f> prev_pts_;
 
-  /// \brief Current features.
+  /// @brief Current features.
   std::vector<cv::Point2f> curr_pts_;
 
-  /// \brief Previous rotation.
+  /// @brief Previous rotation.
   cv::Mat prev_R_;
 
-  /// \brief Previous translation.
+  /// @brief Previous translation.
   cv::Mat prev_t_;
 
-  /// \brief Current rotation.
+  /// @brief Current rotation.
   cv::Mat curr_R_;
 
-  /// \brief Current translation.
+  /// @brief Current translation.
   cv::Mat curr_t_;
 
-  /// \brief Scale parameter.
-  double scale_;
+  /// @brief Scale parameter.
+  double scale_{};
 
-  /// \brief Focal length.
-  double f_;
+  /// @brief Focal length.
+  double f_{};
 
-  /// \brief Principal point.
+  /// @brief Principal point.
   cv::Point2f pp_;
 
-  /// \brief Essential matrix.
+  /// @brief Essential matrix.
   cv::Mat E_;
 
-  /// \brief Optical flow status.
+  /// @brief Optical flow status.
   std::vector<unsigned char> status_;
 
-  /// \brief Masking matrix.
+  /// @brief Masking matrix.
   cv::Mat mask_;
 
-  /// \brief Trajectory windows.
+  /// @brief Trajectory windows.
   cv::Mat img_traj_;
 
-  /// \brief The vector of feature point id.
+  /// @brief The vector of feature point id.
   std::vector<int> idx_;
 
-  /// \brief Unique id of each feature point.
+  /// @brief Unique id of each feature point.
   unsigned int id_;
 
-  /// \brief map of previous feature points and its id.
+  /// @brief map of previous feature points and its id.
   std::map<int, cv::Point2f> prev_pts_map_;
 };
 
